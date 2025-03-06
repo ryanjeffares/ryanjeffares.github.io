@@ -473,7 +473,7 @@ private:
 };
 ```
 
-What the `&`, `const &`, `&&`, and `const &&` after the function name but before the trailing return type mean is that each of those methods are only callable on non-`const` lvalue references, `const` lvalue references, non-`const` rvalue references, and `const` rvalue references, respectively. If I have an `std::optional<std::string>` as a variable and I just call `.value()` on it, I get a regular reference because the variable is an lvalue reference. But, if that `std::optional` was an rvalue, I would get an rvalue reference - i.e., ownership gets transferred.
+What the `&`, `const &`, `&&`, and `const &&` after the function name but before the trailing return type mean is that each of those methods are only callable on non-`const` lvalue references, `const` lvalue references, non-`const` rvalue references, and `const` rvalue references, respectively. If I have an `std::optional<std::string>` as a variable and I just call `.value()` on it, I get a regular reference because the variable is an lvalue. But, if that `std::optional` was an rvalue, I would get an rvalue reference - i.e., ownership gets transferred.
 
 ```cpp
 struct Foo {
@@ -632,6 +632,8 @@ Since signed integer overflow is undefined behaviour, this reports the appropria
 
 This is not meant to convince anybody to rewrite their Rust project in C++, or to be an armed response to Bjarne's [call to action](https://www.msn.com/en-us/public-safety-and-emergencies/general/c-creator-calls-for-help-to-defend-programming-language-from-serious-attacks/ar-AA1A60Mj) to defend the language. This is just a display of some of the cool features of C++ that, as far as I know, don't really exist elsewhere, and that, even if they aren't useful in most situations, make me go *wow, that's __cool__*.
 
-Yes, the memory safety is an issue. Quite a lot of the concerns here can be alleviated with `-Wall -Wextra -Wpedantic -Wconversion -Werror` and some extra `W`s, using LLVM's sanitisers, placing restrictions on yourself like not using raw pointers, etc., but an opt-in approach is never going to fully work. Yes, the refusal to break ABIs is annoying. Yes, the tooling kind of sucks (to be clear, all the different tools (IDEs, compilers, toolchains, package managers etc.) are very good *in and of themselves*, it's just that there's so many and everything's different on different platforms) (CMake is really good actually, you just have a skill issue).
+Yes, the memory safety is an issue. Quite a lot of the concerns here can be alleviated with `-Wall -Wextra -Wpedantic -Wconversion -Werror` and some extra `W`s, using LLVM's sanitisers, placing restrictions on yourself like not using raw pointers, etc., but an opt-in approach is never going to fully work. Yes, the refusal to break ABIs is annoying. Yes, the tooling kind of sucks (to be clear, all the different tools (IDEs, compilers, toolchains, package managers etc.) are very good *in and of themselves*, it's just that there's so many and everything's different on different platforms) (CMake is really good actually, you just have a skill issue). Header files suck ass and nobody has really implemented modules yet.
 
-Other languages are completely appropriate to use in many situations, but I'll always miss these features that make me say *__cool__*.
+I wish safety features and `const`-correctness were on by default. I wish we had pattern matching. I wish we had Rust's enums. I wish we had a package manager that everybody used that just ~~fucking~~ worked. I wish we had a standard and reference implementation with a development cycle like C#/.NET's.
+
+Other languages are completely appropriate, and even preferrable, to use in many situations, but I'll always come back to C++ for my own projects. Because I'll miss these features that make me say *__cool__*.
