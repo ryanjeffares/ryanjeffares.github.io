@@ -1,3 +1,9 @@
+---
+layout: post
+title: "You'll Pry C++ From My Cold, Dead Hands"
+date: 2025-03-06 16:45:00
+categories: cpp, languages
+---
 ## Introduction
 
 So, C++ has been taking a lot of flak recently. A lot of it honestly comes from script kiddies with skill issues, but there is also a lot of well meaning concern about memory safety and some of the less user-friendly aspects of the language. Even the US government [hates it](https://media.defense.gov/2023/Apr/27/2003210083/-1/-1/0/CSI_SOFTWARE_MEMORY_SAFETY_V1.1.PDF) (has somebody sat in the oval office and tried to explain to Donald Trump what a segfault is?).
