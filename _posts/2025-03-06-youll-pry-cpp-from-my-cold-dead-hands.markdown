@@ -50,12 +50,12 @@ This one isn't even *that* bad. Since C++20, I can add a concept to make the err
 ```cpp
 template<typename T>
 concept Addable = requires(const T& a, const T& b) {
-    a + b; // require that this is a valid expression - not examing the return type right now
+    a + b; // require that this is a valid expression - not examing the return type right now
 };
 
 template<Addable T>
 auto add(const T& a, const T& b) -> decltype(a + b) {
-    return a + b;
+    return a + b;
 }
 ```
 ```
@@ -84,12 +84,12 @@ If I wanted to ensure that adding two `T`s produces a `T`, I can specify that to
 ```cpp
 template<typename T>
 concept Addable = requires(const T& a, const T& b) {
-    { a + b } -> T;
+    { a + b } -> T;
 };
 
 template<Addable T>
 auto add(const T& a, const T& b) -> decltype(a + b) {
-    return a + b;
+    return a + b;
 }
 
 struct Foo {
