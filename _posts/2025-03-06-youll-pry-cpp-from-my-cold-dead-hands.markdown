@@ -296,7 +296,7 @@ concept UnaryTypeTrait = requires(T t) {
 };
 
 template<template<UnaryTypeTrait> typename TypeTrait, typename... Types>
-    requires((Bound<Types>::value && ...))
+    requires((Bound<Types>::value && ...))
 class VariantArray {
 public:    
     template<typename... Args>
@@ -387,7 +387,7 @@ main:
 
 The `VariantArray` class, `std::variant`, our structs - they don't even exist. It's just three calls to `std::println()`. Outside of the printing, we're not even using the heap.
 
-Concepts, like Rust's traits, allow us to bring the type guarantees of interfaces to compile time checks with no polymorphism required. But, they allow both further freedom and further control - we can ensure that a bunch of types all have some method `foo()`, but not all the methods need even return the same type. In the same concept, we can ensure that the type is default constructible, constructible from some other type, that some free function `bar()` is callable with an rvalue reference to the type with certain parameters and is `noexcept` and returns a function that is invokable with other parameters and that that's `noexcept`, and that the type has an associated `typedef` that is `const`:
+Concepts, like Rust's traits, allow us to bring the type guarantees of interfaces to compile time checks with no polymorphism required. But, they allow both further freedom and further control - we can ensure that a bunch of types all have some method `foo()`, but not all the methods need even return the same type. In the same concept, we can ensure that the type is default constructible, constructible from some other type, that some free function `bar()` is callable with an rvalue reference to the type and some other parameters and is `noexcept` and returns a function that is `noexcept`, and that the type has an associated `typedef` that is `const`:
 
 ```cpp
 template<typename T, typename U, typename... BarArgs>
@@ -397,8 +397,12 @@ concept HasFooAndAllTheOtherStuffISaid = requires(T value) {
     std::is_const<T::some_typedef>;
 } && std::is_default_constructible_v<T>
   && std::constructible_from<T, U>
-  && std::is_nothrow_invocable_v<decltype(bar), T&&, BarArgs...>;
+  && std::is_nothrow_invocable_v<decltype(bar), T&&, BarArgs...>
+  && std::is_nothrow_invocable_v<std::invoke_result_t<decltype(bar), T&&, BarArgs...>>;
 ```
+
+This power, combined with variadic templates and the additional freedoms of templates, makes for some real spice.
+
 ## 3. Value Categories
 
 Every expression in C++ has, as well as its type, its [value category](https://en.cppreference.com/w/cpp/language/value_category). This is a pretty complicated aspect of the language, and not one that the average programmer needs to know in excruciating detail, but it opens up some pretty neat possibilities.
@@ -570,7 +574,35 @@ int main() {
 }
 ```
 
-Even in debug mode, this basically just compiles to moving 55 into `eax` and returning, because we are forcing this function to run at compile time.
+Even in debug mode, this basically just compiles to moving 55 into `eax` and returning, because we are forcing this function to run at compile time. This of course works with much more complex programs as well, even including strings and collections. What if I was doing some Leetcode easies and I wanted to find the length of the longest word in a sentence?
+
+```cpp
+using namespace std::string_view_literals;
+
+constexpr auto longest_word(std::string_view sentence) noexcept {
+    return std::ranges::max(
+        std::views::split(sentence, " "sv)
+        | std::views::transform([] (const auto& split) {
+            return split.size();
+        })
+    );
+}
+
+int main() {
+    constexpr auto longest_length = longest_word("This is a sentence"sv);
+    return static_cast<int>(longest_length);
+}
+```
+
+Again, this literally compiles to:
+
+```asm
+main:
+        mov     eax, 8
+        ret
+```
+
+Beats 100%?
 
 Something quite cool about `constexpr` is that undefined behaviour *cannot* happen during compile-time execution, so running code as `constexpr` can uncover UB-related bugs:
 
