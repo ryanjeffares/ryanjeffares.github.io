@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "You'll Pry C++ From My Cold, Dead Hands"
-date: 2025-03-06 16:45:00
+date: 2025-03-06 16:45:00 -0000
 categories: cpp, languages
 ---
 ## Introduction
