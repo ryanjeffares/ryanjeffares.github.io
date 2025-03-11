@@ -216,7 +216,25 @@ In other languages, you'll find common types like a tuple to be painstakingly ov
 
 ```cpp
 template<int... Ints>
-auto do_something_with_ints(Ints... ints); // can be called with any amount of integers
+auto do_something_with_ints();
+
+// can be instantiated with any amount of integers
+do_something_with_ints<0, 1, 2, 3, 4, 5>();
+```
+
+And allows us to write functions that take any amount of parameters in a type-safe way, since it's evaluated at compile time:
+
+```cpp
+auto bar(int i, float f, bool b) -> void;
+
+template<typename... Ts>
+auto foo(Ts&&... args) {
+    // args is expanded at compile time...
+    bar(args...);
+}
+
+foo<int, float, bool>(0, 3.14f, true); // ...so this is valid
+foo<std::string, double>("Hello world", 2.0); // ...this is not
 ```
 
 Pack expansion (the `...` after the name of a pack) can be thought of as being rewritten by the compiler as just each element in the pack listed out. It interacts with other language features, like `using` statements and inheritance lists. In absence of proper pattern-matching, this allows us to write relatively concise visitor patterns on `std::variant` and other union-like types:
