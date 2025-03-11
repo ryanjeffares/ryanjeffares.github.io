@@ -103,14 +103,14 @@ add<Foo>(Foo{}, Foo{});
 This is, of course, reasonably possible in some other languages with a similar amount of type bounds:
 
 ```cs
-T Add<T>(T a, T b) where T: IAdditionOperations<T, T, T>
+U Add<T, U>(T a, T b) where T: IAdditionOperators<T, T, U>
 {
     return a + b;
 }
 ```
 
 ```rust
-fn add<T: Add<Output = T> + Copy, U>(a: T, b: T) -> T {
+fn add<T: Add<Output = U> + Copy, U>(a: T, b: T) -> U {
     a + b
 }
 ```
