@@ -100,16 +100,22 @@ struct Foo {
 add<Foo>(Foo{}, Foo{});
 ```
 
-This wasn't possible in C# until version 11 when they added [static abstract interface methods](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/proposals/csharp-11.0/static-abstracts-in-interfaces), and even then it requires polymorphism:
+This is, of course, reasonably possible in some other languages with a similar amount of type bounds:
 
 ```cs
-T Add<T>(T a, T b) where T: INumber<T>
+T Add<T>(T a, T b) where T: IAdditionOperations<T, T, T>
 {
     return a + b;
 }
 ```
 
-And if adding two `T`s together produces a type that isn't `T`, it's joever. This also enables us to call methods on/with and create instances of an unknown template type very easily.
+```rust
+fn add<T: Add<Output = T> + Copy, U>(a: T, b: T) -> T {
+    a + b
+}
+```
+
+We can do any of these if the result type is not `T` too, but before .NET 7 or if `T` is not a numeric type, this would have been awkward (impossible?) in C#. What C++ also brings to the table here is that it's possible to call methods on/with and create instances of an unknown template type very easily.
 
 ```cpp
 template<typename Foo>
@@ -121,9 +127,9 @@ auto use_foo(Foo&& foo) {
 }
 ```
 
-In other languages, this is an error immediately. In C++, if any of these statements are invalid, that error is only reported *when the function is instantiated*. We can use concepts to make sure all of these statements are valid too. Some may scream in horror at the uncertainty of it all, but I think it's quite freeing, and opens up so many more situations in which generic programming can be employed.
+In other languages, this is an error immediately. In C++, if any of these statements are invalid, that error is only reported *when the function is instantiated*. We can use concepts to make sure all of these statements are valid too. Some may scream in horror at the uncertainty of it all, but I think it's quite freeing, and opens up so many more situations in which generic programming can be employed. Personally, I prefer this - I know what kind of type I'm going to instantiate this generic with, so just let me write the damn code and have it just work. If I wanted to write one-or-more trait bounds for every single operation in this function, I'd rather just write an overload.
 
-C# can somewhat achieve this with interfaces, as we saw. In Java, good luck. Rust can do this with trait bounds, and it won't even use polymorphism in that context, but what Rust doesn't have is *specialisation* and *Turing-complete metaprogramming*.
+C# can somewhat achieve this with interfaces and some very explicit type constraints with possible polymorphism, as we saw. In Java, good luck. Rust can do this with trait bounds, and it won't even use polymorphism in that context (most of the time, but it might also use a fat pointer), but what Rust doesn't have is *specialisation* and *Turing-complete metaprogramming*.
 
 Let's compute the Nth Fibonacci number with templates at compile time:
 
@@ -192,12 +198,89 @@ struct iterator {
 C#, Java and even Rust require some runtime work for this. SFINAE was *ugly*, but combining these simple type properties with concepts makes for some incredibly versatile templated code with relatively nice syntax and specific compiler errors.
 
 Templates get even better, because C++ templates also have...
+
 ## 2. Variadic Template Parameters
 
-Say I wanted to expand my little `add` function from the previous section to add any number of values together. Easy, I'll just use an array! Java and C# even give some nice syntax for this:
+Variadic template parameters, a type of [pack](https://en.cppreference.com/w/cpp/language/pack), provide a way to give any amount of parameters to a template, decided at the point of instantiation. They allow the declaration of types like this:
+
+```cpp
+template<typename... Types>
+struct tuple {};
+
+tuple<> t0;                         // no types
+tuple<int> t1;                      // just a single int
+tuple<int, float, std::string> t2;  // int, float, and std::string or in Types
+```
+
+In other languages, you'll find common types like a tuple to be painstakingly overloaded for each amount of generic types. This also works with a single type:
+
+```cpp
+template<int... Ints>
+auto do_something_with_ints(Ints... ints); // can be called with any amount of integers
+```
+
+Pack expansion (the `...` after the name of a pack) can be thought of as being rewritten by the compiler as just each element in the pack listed out. It interacts with other language features, like `using` statements and inheritance lists. In absence of proper pattern-matching, this allows us to write relatively concise visitor patterns on `std::variant` and other union-like types:
+
+```cpp
+template<typename... Lambdas>
+struct Visitor : Lambdas... {
+    using Lambdas::operator()...;
+};
+
+int main() {
+    std::variant<int, float, std::string> v;
+    const auto visitor = Visitor{
+        [] (int i) { std::println("Contained an int {}", i); },
+        [] (float f) { std::println("Contained a float {}", f); },
+        [] (std::string_view s) { std::println("Contained a string {}", s); }
+    };
+
+    std::visit(visitor, v);
+}
+```
+
+My `Visitor` struct can inherit from any amount of types, which are all function-like objects with a call operator in this case. It can be initialised as such, with the inherited call operators exposed.
+
+An incredible feature that uses packs is the [fold expression](https://en.cppreference.com/w/cpp/language/fold). Fold expressions expand a pack, but put an operator between each element. A simple example:
+
+```cpp
+template<typename... Bools>
+auto bool all(Bools... bools) -> bool {
+    return (bools && ...);
+}
+
+// expands to ((true && true) && true) && false
+bool b = all(true, true, true, false);
+```
+
+We can use this to write some more useful functions, like logging an unknown amount of values before C++23's `print` library:
+
+```cpp
+template<typename... Args>
+auto print(Args&&... args) -> void {
+    ((std::cout << args << ' '), ...) << std::endl;
+}
+
+// prints "This is a sentence 0 1 2 3 4 5 true false"
+print("This", "is", "a", "sentence", 0, 1, 2, 3, 4, 5, std::boolalpha, true, false);
+```
+
+So, back to my little `add` function from the previous section. Say I wanted it to be able to add any number of values together. Easy, I'll just use an array! Java and C# even give some nice syntax for this:
 
 ```cs
-T add<T>(params T[] nums) where T: INumber<T> {
+T Add<T>(params T[] nums) where T: IAdditionOperators<T, T, T> {
+    var sum = 0;
+    foreach (var n in nums) {
+        sum += n;
+    }
+    return sum;
+}
+```
+
+Oh wait, this doesn't work, because C# doesn't know how to assign `0` to a `T`. This was not possible at all until C# *11* when they added [static abstract interface properties](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/proposals/csharp-11.0/static-abstracts-in-interfaces):
+
+```cs
+T Add<T>(params T[] nums) where T: INumber<T> {
     var sum = T.Zero;
     foreach (var n in nums) {
         sum += n;
@@ -205,10 +288,10 @@ T add<T>(params T[] nums) where T: INumber<T> {
     return sum;
 }
 
-var sum = add<int>(0, 1, 2, 3, 4, 5);
+Add<int>(0, 1, 2, 3, 4, 5);
 ```
 
-We've now introduced a heap allocation for the array. Don't even get me *started* on the Java version of this. This is the best I could come up with:
+If `T` is not a number, or it's some standard library type we can't extend, we run into the same problem again. We've now also introduced a heap allocation for the array. Don't even get me *started* on the Java version of this. This is the best I could come up with:
 
 ```java
 <T extends Number> T add(T... nums) {
@@ -233,16 +316,21 @@ We've now introduced a heap allocation for the array. Don't even get me *started
 }
 ```
 
-Rust does well here, we can do something like:
+Rust does well here, we can do something like either of these:
 
 ```rust
 use std::ops::Add;
 
-fn sum<T>(nums: &[T]) -> T
-where
-    T: Add<Output = T> + Copy + Default,
-{
+fn add<T: Add<Output = T> + Copy + Default>(nums: &[T]) -> T {
     nums.iter().copied().fold(T::default(), Add::add)
+}
+
+fn add<T: AddAssign + Copy + Default>(nums: &[T]) -> T {
+    let mut sum = T::default();
+    for num in nums {
+        sum += *num;
+    }
+    sum
 }
 ```
 
@@ -259,7 +347,7 @@ auto add(Args&&... nums) -> decltype((nums + ...)) {
 add(0, 1, 2, 3, 4, 5);
 ```
 
-That's it. That's a [fold expression](https://en.cppreference.com/w/cpp/language/fold), by the way. No array, no heap allocation, no polymorphism or dynamic memory. This even works with non-numeric types that support addition, like strings, without any further annoyance.
+That's it. That's the fold expression coming into play. No array, no heap allocation at the call site, no polymorphism or dynamic memory. This even works with non-compile-time constants and non-numeric types that support addition, like strings and even vectors, without any further annoyance.
 
 Let's look at some less academic examples.
 
@@ -284,9 +372,9 @@ auto car = create_gc_instance<Car>(model::lexus, 2025);
 
 Taking `Args` by [*universal reference*](https://isocpp.org/blog/2012/11/universal-references-in-c11-scott-meyers) and using `std::forward` ensures that if we pass a `const` reference, it remains a `const` reference, if we pass an rvalue reference, it remains an rvalue reference and can be used as a "moved-from" value (more on that later).
 
-Programmers often find themselves in a position where they want to store instances of subclasses of some base class in a collection, or implementers of an interface. In a language that supports polymorphism, this is usually trivial - just make the generic collection of type `Base`, and store the instances as pointers. This happens implicitly in the likes of C# and Java, can be done in Rust with `Box<dyn T>`, and in C++ with `std::unique_ptr<T>` or similar.
+Programmers often find themselves in a position where they want to store instances of subclasses of some base class in a collection, or implementers of an interface. In a language that supports polymorphism, this is usually trivial - just make the generic collection of type `Base`, and store the instances as pointers. This happens implicitly in the likes of C# and Java, can be done in Rust with something like a `Box<dyn T>`, and in C++ with `std::unique_ptr<T>` or similar.
 
-But, let's say we're in C++ and we really didn't want to use polymorphism, because we are running code in an environment where [RTTI](https://en.wikipedia.org/wiki/Run-time_type_information) isn't allowed. We're working on some embedded device that doesn't even have a heap, so we know how many elements should be in our array ahead of time and what they should be, they're just not the same type exactly, but could all be described by some interface. Is such a thing possible? Yes!
+But, let's say we're in C++ and we really didn't want to use polymorphism, because we are running code in a performance-critical environment on some very limited embedded device where that isn't allowed. This embedded device doesn't even have a heap, so we know how many elements should be in our array ahead of time and what they should be, they're just not the same type exactly, but could all be described by some interface. Is such a thing possible? Yes!
 
 ```cpp
 template<typename T>
@@ -296,12 +384,12 @@ concept UnaryTypeTrait = requires(T t) {
 };
 
 template<template<UnaryTypeTrait> typename TypeTrait, typename... Types>
-    requires((Bound<Types>::value && ...))
+    requires((TypeTrait<Types>::value && ...))
 class VariantArray {
 public:    
     template<typename... Args>
     VariantArray(Args&&... args)
-        : m_array { Types{std::forward<Args>(args)...}... } {}
+        : m_array { Types{std::forward<Args>(args)... }... } {}
 
     template<typename F>
     auto visit(F&& function) {
@@ -315,7 +403,7 @@ private:
 };
 ```
 
-This ensures that every type given to the `VariantArray` in `Types` all fulfil the same [unary type trait](https://en.cppreference.com/w/cpp/named_req/UnaryTypeTrait) (a more old-school and restrictive way of doing something like our `Addable` concept from earlier - the static property `value` will be `true`/`false` depending on whether the type fulfils the type traits), and then fills the array with a variant for each type, with each variant instance holding a instance of each of the types constructed with `args` in the order we state them in the template argument list. We can also visit each instance in the array with a function passed to the `visit` method. To use it:
+This ensures that every type given to the `VariantArray` in `Types` all fulfil the same [unary type trait](https://en.cppreference.com/w/cpp/named_req/UnaryTypeTrait) (a more old-school and restrictive way of doing something like our `Addable` concept from earlier - the static property `value` will be `true`/`false` depending on whether the type fulfils the type traits) by expanding the pack and checking the type trait on each one and combining it into a logical and expression, and then fills the array with a variant for each type, with each variant instance holding a instance of each of the types constructed with `args` in the order we state them in the template argument list. We can also visit each instance in the array with a function passed to the `visit` method. To use it:
 
 ```cpp
 template<typename T>
@@ -459,7 +547,7 @@ public:
         return std::move(m_value);
     }
 
-    auto value() & -> T& {
+    auto value() const && -> const T&& {
         assert(m_has_value);
         return std::move(m_value);
     }
@@ -634,6 +722,6 @@ This is not meant to convince anybody to rewrite their Rust project in C++, or t
 
 Yes, the memory safety is an issue. Quite a lot of the concerns here can be alleviated with `-Wall -Wextra -Wpedantic -Wconversion -Werror` and some extra `W`s, using LLVM's sanitisers, placing restrictions on yourself like not using raw pointers, etc., but an opt-in approach is never going to fully work. Yes, the refusal to break ABIs is annoying. Yes, the tooling kind of sucks (to be clear, all the different tools (IDEs, compilers, toolchains, package managers etc.) are very good *in and of themselves*, it's just that there's so many and everything's different on different platforms) (CMake is really good actually, you just have a skill issue). Header files suck ass and nobody has really implemented modules yet.
 
-I wish safety features and `const`-correctness were on by default. I wish we had pattern matching. I wish we had Rust's enums. I wish we had a package manager that everybody used that just ~~fucking~~ worked. I wish we had a standard and reference implementation with a development cycle like C#/.NET's.
+I wish safety features and `const`-correctness were on by default. I wish we had pattern matching. I wish we had Rust's enums. I wish we had *one* package manager that everybody used that just ~~fucking~~ worked. I wish we had a standard and reference implementation with a development cycle like C#/.NET's.
 
 Other languages are completely appropriate, and even preferrable, to use in many situations, but I'll always come back to C++ for my own projects. Because I'll miss these features that make me say *__cool__*.
